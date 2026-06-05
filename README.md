@@ -2,8 +2,10 @@
 
 ```bash 
 curl -fsSL https://pixi.sh/install.sh | sh
-source ~/.bashrc 
+```
 
+```bash
+source ~/.bashrc 
 ```
 
 
