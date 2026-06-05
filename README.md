@@ -14,17 +14,22 @@ source ~/.bashrc
 
 ```
 
-## 3. Pixi commands 
+## 3. Pixi Initialsing  commands 
 
 ```bash
 
 cd ~/ardu_ws/pixi_ws
 pixi shell
-pixi run bootstrap
 
 ```
 
-## 4. Check Installation 
+## 4. Pixi Run Command : 
+```bash
+pixi run bootstrap
+```
+
+
+## 5. Check Installation 
 
 ```bash
 source ~/ardu_ws/pixi_ws/devel/setup.bash
