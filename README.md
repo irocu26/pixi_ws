@@ -20,7 +20,7 @@ source ~/.bashrc
 
 cd ~/ardu_ws/pixi_ws
 pixi shell
-pixi bootstrap
+pixi run bootstrap
 
 ```
 
