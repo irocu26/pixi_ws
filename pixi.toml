@@ -1,0 +1,208 @@
+# =============================================================================
+# pixi.toml — Kalibr (ethz-asl) build environment via RoboStack ROS Noetic
+# =============================================================================
+#
+# Goal: reproduce the "Ubuntu 20.04 / ROS Noetic" Kalibr build, but fully inside
+# a conda/pixi environment (no system apt, no /opt/ros). ROS comes from RoboStack
+# (conda packages), everything else from conda-forge.
+#
+# Channel sources are noted per-dependency in comments:
+#   [cf]  = conda-forge
+#   [rs]  = robostack-staging  (RoboStack's ROS Noetic packages, prefixed ros-noetic-*)
+#
+# Notes / caveats (from your experience + Kalibr quirks):
+#   - python 3.8 confirmed working.
+#   - boost 1.74 confirmed working. NOTE: RoboStack's ros-noetic packages were
+#     built against a particular boost; hard-pinning 1.74 *may* cause a solver
+#     conflict. If pixi can't solve, relax the boost pins (see comments below).
+#   - numpy is pinned < 1.24 because Kalibr uses removed aliases (np.float etc.).
+#   - These versions are starting points; tighten/loosen as the solver dictates.
+# =============================================================================
+
+[project]
+name = "kalibr_ws"
+version = "0.1.0"
+description = "RoboStack/pixi workspace to build Kalibr (ethz-asl) against ROS Noetic"
+authors = ["ronitkundnani08@gmail.com"]
+channels = [
+    "conda-forge",
+    "robostack-staging", # RoboStack ROS Noetic (ros-noetic-*) lives here
+]
+# RoboStack ROS Noetic targets linux-64. (osx/win use different distros.)
+platforms = ["linux-64"]
+
+# -----------------------------------------------------------------------------
+# Core: Python + ROS Noetic + catkin build system
+# -----------------------------------------------------------------------------
+[dependencies]
+# NOTE: current robostack-staging Noetic is built ONLY for py 3.9/3.11/3.12
+# (NOT 3.8 anymore) and requires numpy>=1.26. Your old "3.8 + boost 1.74" combo
+# came from an older RoboStack snapshot that this channel no longer serves.
+#
+# We PIN 3.11 explicitly: leaving it free let the solver pick python 3.12 while
+# boost-python only had a 3.11 build (libboost_python311) -> a broken,
+# inconsistent env. Pinning 3.11 forces ros + boost-python + numpy to all agree.
+# (3.11 chosen because conda-forge boost 1.82's python lib is built for it.)
+python = "3.11.*"                      # [cf] pinned for ros/boost/numpy ABI consistency
+
+# --- ROS Noetic (RoboStack) ---
+ros-noetic-desktop-full = "*"          # [rs] full ROS Noetic (gazebo, perception, cv_bridge, etc.)
+# Lighter alternative if you ever want to slim it down:
+# ros-noetic-desktop = "*"             # [rs] desktop without the full perception/sim stack
+
+# --- catkin / build tooling ---
+ros-noetic-catkin = "*"                # [rs] catkin CMake macros
+catkin_tools = "*"                     # [cf] provides `catkin build`/`catkin config`; pulls osrf_pycommon itself
+cmake = "*"                            # [cf]
+make = "*"                             # [cf]
+ninja = "*"                            # [cf] (optional, faster builds)
+pkg-config = "*"                       # [cf]
+c-compiler = "*"                       # [cf] meta-pkg -> gcc
+cxx-compiler = "*"                     # [cf] meta-pkg -> g++
+
+# -----------------------------------------------------------------------------
+# Kalibr C/C++ build dependencies
+# (maps the apt list: libeigen3-dev libboost-all-dev libsuitesparse-dev
+#  doxygen libopencv-dev libpoco-dev libtbb-dev libblas-dev liblapack-dev)
+# -----------------------------------------------------------------------------
+[dependencies.eigen]
+version = "3.4.*"                       # [cf] = libeigen3-dev (3.3.x also fine)
+channel = "conda-forge"
+
+[dependencies.suitesparse]
+version = "*"                           # [cf] = libsuitesparse-dev
+channel = "conda-forge"
+
+[dependencies.doxygen]
+version = "*"                           # [cf]
+channel = "conda-forge"
+
+[dependencies.poco]
+version = "*"                           # [cf] = libpoco-dev
+channel = "conda-forge"
+
+[dependencies.tbb-devel]
+version = "*"                           # [cf] = libtbb-dev (headers); pulls in tbb runtime
+channel = "conda-forge"
+
+[dependencies.libblas]
+version = "*"                           # [cf] = libblas-dev
+channel = "conda-forge"
+
+[dependencies.liblapack]
+version = "*"                           # [cf] = liblapack-dev
+channel = "conda-forge"
+
+# --- Boost ---
+# conda-forge splits boost into:
+#   boost-cpp -> the C++ libraries + headers (= libboost-all-dev C++ side)
+#   boost     -> adds boost-python (Kalibr's python bindings need this)
+# STRATEGY: let RoboStack/conda-forge pick a compatible boost first (unpinned).
+# If the build misbehaves, fall back to the version confirmed working for you:
+#   boost-cpp = "1.74.*"   and   boost = "1.74.*"   (both MUST match)
+[dependencies.boost-cpp]
+version = "*"                           # [cf] unpinned — solver decides (fallback: 1.74.*)
+channel = "conda-forge"
+
+[dependencies.boost]
+version = "*"                           # [cf] includes boost-python (fallback: 1.74.*)
+channel = "conda-forge"
+
+# --- OpenCV ---
+# ROS Noetic uses OpenCV 4.2. RoboStack's cv_bridge/vision_opencv already pull a
+# compatible opencv, so normally you DON'T need to pin opencv yourself. Listed
+# here (commented) only if you want to force it:
+# [dependencies.libopencv]
+# version = "4.*"                       # [cf] = libopencv-dev
+# channel = "conda-forge"
+
+# Note on libv4l-dev: there is no clean conda equivalent and Kalibr does not
+# actually need v4l for building/running calibration. Omitted on purpose.
+
+# -----------------------------------------------------------------------------
+# Kalibr Python runtime dependencies
+# (maps: python3-scipy matplotlib ipython wxgtk4.0 tk igraph pyx)
+# -----------------------------------------------------------------------------
+# numpy: robostack Noetic now REQUIRES numpy>=1.26, so we can't pin <1.24.
+# WARNING: Kalibr historically used removed aliases (np.float/np.int). On numpy
+# >=1.24 you may hit runtime AttributeErrors -> use recent Kalibr master (it has
+# fixes) or sed-patch the offending np.float/np.int usages if they appear.
+[dependencies.numpy]
+version = ">=1.26"                       # [cf] forced by ros-noetic-catkin
+channel = "conda-forge"
+
+[dependencies.scipy]
+version = "*"                            # [cf]
+channel = "conda-forge"
+
+[dependencies.matplotlib]
+version = "*"                            # [cf]
+channel = "conda-forge"
+
+[dependencies.ipython]
+version = "*"                            # [cf]
+channel = "conda-forge"
+
+[dependencies.wxpython]
+version = "4.*"                          # [cf] = python3-wxgtk4.0
+channel = "conda-forge"
+
+[dependencies.tk]
+version = "*"                            # [cf] = python3-tk (Tkinter backend)
+channel = "conda-forge"
+
+[dependencies.python-igraph]
+version = "*"                            # [cf] = python3-igraph
+channel = "conda-forge"
+
+[dependencies.pyx]
+version = "*"                            # [cf] = python3-pyx
+channel = "conda-forge"
+
+# --- misc build helpers from the apt "general requirements" list ---
+[dependencies.git]
+version = "*"                            # [cf]
+channel = "conda-forge"
+[dependencies.wget]
+version = "*"                            # [cf]
+channel = "conda-forge"
+[dependencies.autoconf]
+version = "*"                            # [cf]
+channel = "conda-forge"
+[dependencies.automake]
+version = "*"                            # [cf]
+channel = "conda-forge"
+
+# -----------------------------------------------------------------------------
+# Convenience tasks
+#   Run with:  pixi run <task>
+# RoboStack auto-sources ROS when the pixi env activates, so we extend the
+# catkin workspace onto $CONDA_PREFIX (NOT /opt/ros).
+# -----------------------------------------------------------------------------
+[tasks]
+# 1) clone Kalibr into ./src
+clone = """
+mkdir -p src && \
+[ -d src/kalibr ] || git clone https://github.com/irocu26/kalibr.git src/kalibr
+"""
+
+# 2) initialise + configure the catkin workspace (Release build)
+configure = """
+catkin init && \
+catkin config --extend $CONDA_PREFIX && \
+catkin config --merge-devel && \
+catkin config --cmake-args -DCMAKE_BUILD_TYPE=Release
+"""
+
+# 3) build Kalibr — uses all logical cores via nproc (halve it if you run out of RAM)
+build = "catkin build -DCMAKE_BUILD_TYPE=Release -j$(nproc)"
+
+# 4) one-shot: clone + configure + build
+bootstrap = { depends-on = ["clone", "configure", "build"] }
+
+# 5) reminder for how to use Kalibr afterwards
+help = """
+echo 'After build, source the workspace inside the pixi shell:' && \
+echo '  source devel/setup.bash' && \
+echo 'then e.g.:  rosrun kalibr kalibr_calibrate_cameras --help'
+"""

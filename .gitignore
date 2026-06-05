@@ -1,0 +1,10 @@
+.catkin_tools
+.vscode
+build/
+devel/
+output/
+logs/
+recipe/
+src/
+.pixi
+pixi.lock
